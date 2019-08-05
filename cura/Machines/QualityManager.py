@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Ultimaker B.V.
+# Copyright (c) 2019 Ultimaker B.V.
 # Cura is released under the terms of the LGPLv3 or higher.
 
 from typing import TYPE_CHECKING, Optional, cast, Dict, List, Set
@@ -154,12 +154,19 @@ class QualityManager(QObject):
 
             quality_group.is_available = is_available
 
+    ##  Gets the quality groups with default intents for every quality type, for
+    #   the given machine.
     #
-    # Gets all quality groups for the given machine. Both available and unavailable ones will be included.
-    # It returns a dictionary with "quality_type"s as keys and "QualityGroup"s as values.
-    # Whether a QualityGroup is available can be known via the field QualityGroup.is_available.
-    # For more details, see QualityGroup.
-    #
+    #   Both available and unavailable quality groups will be included (so
+    #   including any quality types that are only available to one of the
+    #   extruders). Whether a quality group is available can be determined via
+    #   the field QualityGroup.is_available.
+    #   \param machine The global stack for which to return the default intent
+    #   quality groups.
+    #   \return A dictionary with quality types as keys and the appropriate
+    #   quality group for those quality types. There can only be one quality
+    #   group per quality type since it only returns the quality group for the
+    #   "default" intent category.
     def getDefaultIntentQualityGroups(self, machine: "GlobalStack") -> Dict[str, QualityGroup]:
         machine_definition_id = getMachineDefinitionIDForQualitySearch(machine.definition)
 
