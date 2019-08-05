@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Ultimaker B.V.
+# Copyright (c) 2019 Ultimaker B.V.
 # Cura is released under the terms of the LGPLv3 or higher.
 
 import time
@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     from cura.CuraApplication import CuraApplication
     from cura.Settings.CuraContainerStack import CuraContainerStack
     from cura.Machines.MaterialManager import MaterialManager
-    from cura.Machines.QualityManager import QualityManager
     from cura.Machines.VariantManager import VariantManager
     from cura.Machines.ContainerNode import ContainerNode
     from cura.Machines.QualityChangesGroup import QualityChangesGroup
@@ -1298,42 +1297,43 @@ class MachineManager(QObject):
     def _updateQualityWithMaterial(self, *args: Any) -> None:
         if self._global_container_stack is None:
             return
-        Logger.log("d", "Updating quality/quality_changes due to material change")
-        current_quality_tuple = None
+        Logger.log("d", "Updating quality/intent/quality_changes due to material change.")
+        current_quality_type = None
+        current_intent_category = None
         if self._current_quality_group:
-            current_quality_tuple = self._current_quality_group.quality_tuple
+            current_quality_type = self._current_quality_group.quality_type
+            current_intent_category = self._current_quality_group.intent_category
         candidate_quality_groups = self._intent_manager.getQualityGroups(self._global_container_stack)
-        available_quality_types = {qt for qt, g in candidate_quality_groups.items() if g.is_available}
+        available_qualities_and_intents = {quality_and_intent for quality_and_intent, group in candidate_quality_groups.items() if group.is_available}
 
-        Logger.log("d", "Current quality type = [%s]", str(current_quality_tuple))
+        Logger.log("d", "Current quality type = [%s]", str(current_quality_type))
         if not self.activeMaterialsCompatible():
-            if current_quality_tuple is not None:
+            if current_quality_type is not None:
                 Logger.log("i", "Active materials are not compatible, setting all qualities to empty (Not Supported).")
                 self._setEmptyQuality()
             return
 
-        if not available_quality_types:
+        if not available_qualities_and_intents:
             if self._current_quality_changes_group is None:
                 Logger.log("i", "No available quality types found, setting all qualities to empty (Not Supported).")
                 self._setEmptyQuality()
             return
 
-        if current_quality_tuple in available_quality_types:
-            Logger.log("i", "Current available quality type [%s] is available, applying changes.", str(current_quality_tuple))
-            self._setQualityGroup(candidate_quality_groups[current_quality_tuple], empty_quality_changes = False)
+        if (current_intent_category, current_quality_type) in available_qualities_and_intents:
+            Logger.log("i", "Current available quality type [%s] is available, applying changes.", str(current_quality_type))
+            self._setQualityGroup(candidate_quality_groups[(current_intent_category, current_quality_type)], empty_quality_changes = False)
             return
 
         # The current quality type is not available so we use the preferred quality type if it's available,
         # otherwise use one of the available quality types.
-        quality_tuple = sorted(list(available_quality_types))[0]
+        quality_tuple = sorted(list(available_qualities_and_intents))[0]
         preferred_quality_type = self._global_container_stack.getMetaDataEntry("preferred_quality_type")
         preferred_intent_category = self._global_container_stack.getMetaDataEntry("preferred_intent_category", default = DEFAULT_INTENT_CATEGORY)
         preferred_quality_tuple = (preferred_intent_category, preferred_quality_type)
-        if preferred_quality_tuple in available_quality_types:
+        if preferred_quality_tuple in available_qualities_and_intents:
             quality_tuple = preferred_quality_tuple
 
-        Logger.log("i", "The current quality type [%s] is not available, switching to [%s] instead",
-                   str(current_quality_tuple), str(quality_tuple))
+        Logger.log("i", "The current quality/intent [{current_quality}, {current_intent}] is not available, switching to [{preferred_tuple}] instead".format(current_quality = current_quality_type, current_intent = current_intent_category, preferred_tuple = quality_tuple))
         self._setQualityGroup(candidate_quality_groups[quality_tuple], empty_quality_changes = True)
 
     def updateMaterialWithVariant(self, position: Optional[str]) -> None:
